@@ -36,7 +36,7 @@ ORDER_RELEASED_AT = "2026-10-22 08:30:00"
 
 PRIORITY_RANK = {"URGENT": 1, "HIGH": 2, "NORMAL": 3, "LOW": 4}
 PRIORITY_SHARE = {"URGENT": 0.05, "HIGH": 0.15, "LOW": 0.20}  # NORMAL = the rest
-DAYS_PER_OP = {"URGENT": 1.5, "HIGH": 2.5, "NORMAL": 3.5, "LOW": 4.5}
+DAYS_PER_OP = {"URGENT": 1.0, "HIGH": 1.5, "NORMAL": 2.0, "LOW": 3.0}
 RELEASE_WEEKS = 5
 DUE_CAP = (HORIZON_END_DT - timedelta(days=4)).replace(hour=17, minute=0, second=0)
 
@@ -192,17 +192,26 @@ def load_by_group(master: dict, calendar: dict, orders: dict) -> dict[str, dict]
     """Planned work minutes versus calendar minutes per machine group.
 
     Planned = sum of base_minutes (ignores machine speed, changeovers, downtime).
-    Available = sum of machine_calendar minutes. A rough guide, not a result.
+    load_pct       = planned / calendar minutes of the whole 8-week horizon.
+    early_load_pct = planned / calendar minutes of weeks 1-5, when work arrives.
+    Rough guides, not scheduling results.
     """
     group_of = {m["machine_id"]: m["machine_group"] for m in master["machine"]}
+    cutoff = _fmt(HORIZON_START_DT + timedelta(weeks=RELEASE_WEEKS))
     available = dict.fromkeys(MACHINE_GROUPS, 0)
+    early = dict.fromkeys(MACHINE_GROUPS, 0)
     for r in calendar["machine_calendar"]:
-        available[group_of[r["machine_id"]]] += r["available_minutes"]
+        g = group_of[r["machine_id"]]
+        available[g] += r["available_minutes"]
+        if r["window_start"] < cutoff:
+            early[g] += r["available_minutes"]
     planned = dict.fromkeys(MACHINE_GROUPS, 0)
     for op in orders["operation"]:
         planned[op["required_machine_group"]] += op["base_minutes"]
     return {g: {"planned_minutes": planned[g], "available_minutes": available[g],
-                "load_pct": round(100 * planned[g] / available[g], 1) if available[g] else 0.0}
+                "load_pct": round(100 * planned[g] / available[g], 1) if available[g] else 0.0,
+                "early_available_minutes": early[g],
+                "early_load_pct": round(100 * planned[g] / early[g], 1) if early[g] else 0.0}
             for g in MACHINE_GROUPS}
 
 
@@ -219,7 +228,8 @@ if __name__ == "__main__":
     for table_name, table_rows in order_data.items():
         print(f"{table_name:24s} {len(table_rows):5d}")
     print()
-    print(f"{'machine group':14s} {'planned min':>12s} {'available min':>14s} {'load %':>7s}")
+    print(f"{'machine group':14s} {'planned min':>12s} {'available min':>14s} "
+          f"{'load %':>7s} {'wk1-5 load %':>13s}")
     for group, info in load_by_group(master_data, calendar_data, order_data).items():
         print(f"{group:14s} {info['planned_minutes']:12d} {info['available_minutes']:14d} "
-              f"{info['load_pct']:7.1f}")
+              f"{info['load_pct']:7.1f} {info['early_load_pct']:13.1f}")
