@@ -11,7 +11,7 @@ APP = Path(__file__).resolve().parents[2] / "app"
 sys.path.insert(0, str(APP))
 
 PAGES = ["Home.py", "pages/2_Gantt.py", "pages/3_Orders.py", "pages/4_Exceptions.py",
-         "pages/5_Engine.py", "pages/6_Compare.py", "pages/7_Reschedule.py", "pages/8_Data.py", "pages/9_Export.py"]
+         "pages/5_Engine.py", "pages/6_Compare.py", "pages/7_Reschedule.py", "pages/8_Data.py", "pages/9_Export.py","pages/10_Anomalies.py"]
 
 @pytest.fixture(scope="module")
 def db(tmp_path_factory):
@@ -50,3 +50,12 @@ def test_reschedule_button_creates_a_child_run(tmp_path, monkeypatch):
     assert not at.exception, at.exception
     assert at.success or at.error
     assert not (at.error and "Reschedule failed" in at.error[0].value), at.error[0].value
+
+def test_anomaly_demo_detects_everything(tmp_path, monkeypatch):
+    path = tmp_path / "app.db"
+    build_database(path, "starter")
+    monkeypatch.setenv("MFG_DB", str(path))
+    at = AppTest.from_file(str(APP / "pages/10_Anomalies.py"), default_timeout=120).run()
+    at.button[0].click().run()
+    assert not at.exception, at.exception
+    assert at.success
