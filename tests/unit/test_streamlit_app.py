@@ -11,7 +11,7 @@ APP = Path(__file__).resolve().parents[2] / "app"
 sys.path.insert(0, str(APP))
 
 PAGES = ["Home.py", "pages/2_Gantt.py", "pages/3_Orders.py", "pages/4_Exceptions.py",
-         "pages/5_Engine.py", "pages/6_Compare.py", "pages/7_Reschedule.py"]
+         "pages/5_Engine.py", "pages/6_Compare.py", "pages/7_Reschedule.py", "pages/8_Data.py", "pages/9_Export.py"]
 
 @pytest.fixture(scope="module")
 def db(tmp_path_factory):
