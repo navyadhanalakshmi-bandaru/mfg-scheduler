@@ -3,6 +3,7 @@
 Never opens the ground-truth database. Start with:
     uvicorn src.api.app:app --reload
 Interactive docs: http://127.0.0.1:8000/docs
+UI: http://127.0.0.1:8000/
 """
 import json
 import sqlite3
@@ -11,11 +12,14 @@ from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi import Path as PathParam
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from config.settings import DB_PATH
 from src.db.connection import connect, query
 from src.services import runs as run_service
+
+UI_FILE = Path(__file__).resolve().parents[1] / "ui" / "index.html"
 
 RunId = Annotated[str, PathParam(pattern=r"^RUN-2026-\d{6}$")]
 RunIdQuery = Annotated[str, Query(pattern=r"^RUN-2026-\d{6}$")]
@@ -65,8 +69,12 @@ def create_app(db_path=DB_PATH) -> FastAPI:
     db_path = Path(db_path)
     if not db_path.exists():
         raise RuntimeError(f"{db_path} not found; run: python -m src.services.bootstrap")
-    app = FastAPI(title="Manufacturing Scheduler API", version="0.2")
+    app = FastAPI(title="Manufacturing Scheduler API", version="0.3")
     app.state.db_path = db_path
+
+    @app.get("/", include_in_schema=False)
+    def index():
+        return FileResponse(UI_FILE)
 
     @app.get("/health")
     def health(con: Con):

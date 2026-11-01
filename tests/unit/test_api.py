@@ -1,4 +1,4 @@
-"""Tests for the API (Phase 6, slice 1)."""
+"""Tests for the API (Phase 6 and Phase 7a)."""
 from pathlib import Path
 
 import pytest
@@ -14,6 +14,10 @@ def api(tmp_path_factory):
     summary = build_database(path, "starter")
     with TestClient(create_app(path)) as client:
         yield client, summary["run_id"]
+
+
+def _first_machine(client, run_id):
+    return client.get(f"/runs/{run_id}/schedule", params={"limit": 1}).json()[0]["machine_id"]
 
 
 def test_health(api):
@@ -91,8 +95,6 @@ def test_api_and_services_never_reference_the_ground_truth_db():
             text = path.read_text(encoding="utf-8")
             assert "anomaly_ground_truth" not in text, path
             assert "GROUND_TRUTH" not in text, path
-def _first_machine(client, run_id):
-    return client.get(f"/runs/{run_id}/schedule", params={"limit": 1}).json()[0]["machine_id"]
 
 
 def test_metrics_route(api):
@@ -150,3 +152,11 @@ def test_compare_route(api):
     assert client.get("/runs/compare", params={"a": base, "b": "RUN-2026-999999"}).status_code == 404
     assert client.get("/runs/compare", params={"a": base, "b": "nope"}).status_code == 422
     assert client.get("/runs/compare", params={"a": base}).status_code == 422
+
+
+def test_ui_page_is_served(api):
+    client, _ = api
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "Manufacturing Scheduler" in resp.text
