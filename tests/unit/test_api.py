@@ -91,3 +91,62 @@ def test_api_and_services_never_reference_the_ground_truth_db():
             text = path.read_text(encoding="utf-8")
             assert "anomaly_ground_truth" not in text, path
             assert "GROUND_TRUTH" not in text, path
+def _first_machine(client, run_id):
+    return client.get(f"/runs/{run_id}/schedule", params={"limit": 1}).json()[0]["machine_id"]
+
+
+def test_metrics_route(api):
+    client, base = api
+    body = client.get(f"/runs/{base}/metrics").json()
+    assert isinstance(body, dict)
+    assert "makespan_minutes" in body and "late_orders" in body
+    assert client.get("/runs/RUN-2026-999999/metrics").status_code == 404
+    assert client.get("/runs/not-a-run/metrics").status_code == 422
+
+
+def test_reschedule_with_breakdown_creates_validated_child_run(api):
+    client, base = api
+    machine = _first_machine(client, base)
+    resp = client.post(f"/runs/{base}/reschedule", json={
+        "trigger_time": "2026-11-02 00:00:00",
+        "why": "API test breakdown",
+        "downtimes": [{"machine_id": machine,
+                       "down_start": "2026-11-03 06:00:00",
+                       "down_end": "2026-11-03 18:00:00"}]})
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    new_id = body["run_id"]
+    assert new_id != base and body["parent_run_id"] == base
+    assert body["violation_count"] == 0
+    assert body["feasibility_label"] == "FEASIBLE"
+    detail = client.get(f"/runs/{new_id}").json()
+    assert detail["run_type"] == "RESCHEDULE" and detail["parent_run_id"] == base
+    assert client.get(f"/runs/{new_id}/schedule", params={"limit": 1}).json()
+
+
+def test_reschedule_rejects_bad_input(api):
+    client, base = api
+    machine = _first_machine(client, base)
+    assert client.post("/runs/RUN-2026-999999/reschedule", json={
+        "trigger_time": "2026-11-02 00:00:00", "why": "x"}).status_code == 404
+    assert client.post(f"/runs/{base}/reschedule", json={
+        "trigger_time": "tomorrow", "why": "x"}).status_code == 422
+    assert client.post(f"/runs/{base}/reschedule", json={
+        "trigger_time": "2026-11-02 00:00:00", "why": ""}).status_code == 422
+    # a downtime that starts before the trigger time is refused by the engine
+    early = client.post(f"/runs/{base}/reschedule", json={
+        "trigger_time": "2026-11-05 00:00:00", "why": "x",
+        "downtimes": [{"machine_id": machine, "down_start": "2026-11-03 06:00:00",
+                       "down_end": "2026-11-03 18:00:00"}]})
+    assert early.status_code == 400, early.text
+
+
+def test_compare_route(api):
+    client, base = api
+    other = client.post("/runs/baseline", json={"rule": "PRIORITY_EDD"}).json()["run_id"]
+    body = client.get("/runs/compare", params={"a": base, "b": other})
+    assert body.status_code == 200 and isinstance(body.json(), dict) and body.json()
+    assert client.get("/runs/compare", params={"a": base, "b": base}).status_code == 200
+    assert client.get("/runs/compare", params={"a": base, "b": "RUN-2026-999999"}).status_code == 404
+    assert client.get("/runs/compare", params={"a": base, "b": "nope"}).status_code == 422
+    assert client.get("/runs/compare", params={"a": base}).status_code == 422

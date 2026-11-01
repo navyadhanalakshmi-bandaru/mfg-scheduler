@@ -11,17 +11,35 @@ from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi import Path as PathParam
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from config.settings import DB_PATH
 from src.db.connection import connect, query
 from src.services import runs as run_service
 
 RunId = Annotated[str, PathParam(pattern=r"^RUN-2026-\d{6}$")]
+RunIdQuery = Annotated[str, Query(pattern=r"^RUN-2026-\d{6}$")]
+Timestamp = Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")]
+Rule = Literal["EDD", "PRIORITY_EDD", "CRITICAL_RATIO"]
 
 
 class BaselineRequest(BaseModel):
-    rule: Literal["EDD", "PRIORITY_EDD", "CRITICAL_RATIO"] = "CRITICAL_RATIO"
+    rule: Rule = "CRITICAL_RATIO"
+
+
+class DowntimeIn(BaseModel):
+    machine_id: Annotated[str, Field(pattern=r"^MACH-\d{3}$")]
+    down_start: Timestamp
+    down_end: Timestamp
+    downtime_type: Literal["PLANNED_MAINTENANCE", "BREAKDOWN", "CALIBRATION", "HOLIDAY"] = "BREAKDOWN"
+    reason: str | None = None
+
+
+class RescheduleRequest(BaseModel):
+    trigger_time: Timestamp
+    why: str = Field(min_length=1, max_length=200)
+    downtimes: list[DowntimeIn] = []
+    rule: Rule | None = None
 
 
 def get_con(request: Request):
@@ -47,7 +65,7 @@ def create_app(db_path=DB_PATH) -> FastAPI:
     db_path = Path(db_path)
     if not db_path.exists():
         raise RuntimeError(f"{db_path} not found; run: python -m src.services.bootstrap")
-    app = FastAPI(title="Manufacturing Scheduler API", version="0.1")
+    app = FastAPI(title="Manufacturing Scheduler API", version="0.2")
     app.state.db_path = db_path
 
     @app.get("/health")
@@ -61,6 +79,13 @@ def create_app(db_path=DB_PATH) -> FastAPI:
                           " feasibility_label, started_at, finished_at"
                           " FROM schedule_run ORDER BY run_id")
 
+    # Must be declared before /runs/{run_id}, or "compare" is read as a run id.
+    @app.get("/runs/compare")
+    def compare_two_runs(con: Con, a: RunIdQuery, b: RunIdQuery):
+        run_row(con, a)
+        run_row(con, b)
+        return run_service.compare(con, a, b)
+
     @app.get("/runs/{run_id}")
     def get_run(run_id: RunId, con: Con):
         row = run_row(con, run_id)
@@ -72,6 +97,11 @@ def create_app(db_path=DB_PATH) -> FastAPI:
         row["exceptions"] = con.execute(
             "SELECT COUNT(*) FROM scheduling_exception WHERE run_id = ?", (run_id,)).fetchone()[0]
         return row
+
+    @app.get("/runs/{run_id}/metrics")
+    def get_metrics(run_id: RunId, con: Con):
+        run_row(con, run_id)
+        return run_service.metrics(con, run_id)
 
     @app.get("/runs/{run_id}/schedule")
     def get_schedule(run_id: RunId, con: Con, machine_id: str | None = None,
@@ -121,6 +151,18 @@ def create_app(db_path=DB_PATH) -> FastAPI:
     def validate_run_route(run_id: RunId, con: Con):
         run_row(con, run_id)
         return run_service.validate(con, run_id)
+
+    @app.post("/runs/{run_id}/reschedule", status_code=201)
+    def reschedule_route(run_id: RunId, body: RescheduleRequest, con: Con):
+        run_row(con, run_id)
+        try:
+            return run_service.reschedule_run(
+                con, run_id, body.trigger_time, body.why,
+                downtimes=[d.model_dump(exclude_none=True) for d in body.downtimes],
+                rule=body.rule)
+        except (ValueError, sqlite3.IntegrityError) as exc:
+            con.rollback()
+            raise HTTPException(400, str(exc)) from exc
 
     return app
 

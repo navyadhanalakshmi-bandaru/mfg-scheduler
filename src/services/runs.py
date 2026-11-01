@@ -4,6 +4,9 @@ from collections import Counter
 
 from src.engine.baseline import write_baseline
 from src.engine.dispatcher import dispatch, prepare
+from src.engine.reschedule import reschedule
+from src.metrics.compare import compare_runs
+from src.metrics.kpis import compute_metrics, record_metrics
 from src.validation.constraints import validate_and_record
 
 RULES = ("EDD", "PRIORITY_EDD", "CRITICAL_RATIO")
@@ -47,3 +50,26 @@ def validate(con: sqlite3.Connection, run_id: str) -> dict:
     violations = validate_and_record(con, run_id)
     con.commit()
     return summarize(con, run_id, violations)
+
+
+def reschedule_run(con: sqlite3.Connection, parent_run_id: str, trigger_time: str, why: str,
+                   downtimes=(), rule: str | None = None) -> dict:
+    """Reschedule, then validate, then store KPIs. Returns the new run's summary."""
+    if rule is not None and rule not in RULES:
+        raise ValueError(f"unknown rule {rule}; choose from {RULES}")
+    new_id = reschedule(con, parent_run_id, trigger_time, why,
+                        downtimes=list(downtimes), rule=rule)
+    violations = validate_and_record(con, new_id)
+    record_metrics(con, new_id)
+    con.commit()
+    summary = summarize(con, new_id, violations)
+    summary["parent_run_id"] = parent_run_id
+    return summary
+
+
+def metrics(con: sqlite3.Connection, run_id: str) -> dict:
+    return compute_metrics(con, run_id)
+
+
+def compare(con: sqlite3.Connection, base_run_id: str, other_run_id: str) -> dict:
+    return compare_runs(con, base_run_id, other_run_id)
