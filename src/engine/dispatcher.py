@@ -156,6 +156,19 @@ class _Engine:
             not_before = min(retry)
         return None
 
+    def seed(self, p: Placement, op, family: str) -> None:
+        """Book an already-fixed placement (rescheduling) so new work is planned around it."""
+        mid = p.machine_id
+        self.tl[mid].reserve(p.setup_start, p.end)
+        w = self._window(mid, p.setup_start)
+        self.labor.setdefault((op.labor_skill, w[2], w[3]), Usage()).add(
+            p.setup_start, p.end, op.labor_headcount)
+        for tool_id, need in self.m.step_tools.get(op.step_id, []):
+            self.tools.setdefault(tool_id, Usage()).add(p.setup_start, p.end, need)
+        self.last_end[mid] = max(self.last_end.get(mid, p.end), p.end)
+        self.last_family[mid] = family
+        self.last_op[mid] = p.operation_id
+
     def place(self, op, family: str, ready: datetime, rule: str) -> Placement | None:
         options, record = [], []
         for cand in self.m.candidates.get(op.step_id, []):
@@ -187,8 +200,15 @@ class _Engine:
 
 
 def dispatch(model: Model, feas: FeasibilityResult, timelines: dict[str, MachineTimeline],
-             windows: dict[str, list[Window]], rule: str = "PRIORITY_EDD") -> DispatchResult:
-    """Place every feasible order. The passed timelines are not modified."""
+             windows: dict[str, list[Window]], rule: str = "PRIORITY_EDD",
+             locked: list[Placement] | None = None,
+             not_before: datetime | None = None) -> DispatchResult:
+    """Place every feasible order. The passed timelines are not modified.
+
+    locked: placements that are already fixed (rescheduling). They are booked first,
+    are not part of the result, and their orders continue from the next operation.
+    not_before: nothing new may be planned before this time (rescheduling).
+    """
     if rule not in RULES:
         raise ValueError(f"unknown rule {rule!r}; choose from {RULES}")
     engine = _Engine(model, timelines, windows)
@@ -202,10 +222,19 @@ def dispatch(model: Model, feas: FeasibilityResult, timelines: dict[str, Machine
             acc[i] = acc[i + 1] + ops[i].base_minutes
         suffix[oid] = acc
 
+    op_by_id = {op.operation_id: op for ops in model.ops_by_order.values() for op in ops}
+    locked_count: dict[str, int] = {}
+    locked_end: dict[str, datetime] = {}
+    for p in sorted(locked or [], key=lambda x: (x.setup_start, x.operation_id)):
+        engine.seed(p, op_by_id[p.operation_id], model.orders[p.order_id].family)
+        locked_count[p.order_id] = locked_count.get(p.order_id, 0) + 1
+        locked_end[p.order_id] = max(locked_end.get(p.order_id, p.end), p.end)
     active = [o for o in sorted(model.orders)
-              if o not in feas.infeasible_orders and model.ops_by_order.get(o)]
-    idx = dict.fromkeys(active, 0)
-    free_at = {o: release[o] for o in active}
+              if o not in feas.infeasible_orders and model.ops_by_order.get(o)
+              and locked_count.get(o, 0) < len(model.ops_by_order[o])]
+    idx = {o: locked_count.get(o, 0) for o in active}
+    free_at = {o: max(release[o], locked_end.get(o, release[o]), not_before or release[o])
+               for o in active}
     result = DispatchResult(rule=rule, skipped_orders=set(feas.infeasible_orders))
 
     def ready(o: str) -> datetime:
