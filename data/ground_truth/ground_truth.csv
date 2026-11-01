@@ -1,0 +1,26 @@
+gt_id,run_id,record_entity,record_id,related_record_id,issue_type,ground_truth,description,created_at
+GT-2026-000001,RUN-2026-000002,operation_schedule,SCH-2026-002087,SCH-2026-002086,OVERLAP,1,"SCH-2026-002087 moved 38 min earlier so it starts at 2026-11-05 06:38:00, inside SCH-2026-002086 on MACH-003 (which runs until 2026-11-05 07:16:00)",2026-10-22 11:00:00
+GT-2026-000002,RUN-2026-000002,operation_schedule,SCH-2026-003151,SCH-2026-003127,OVERLAP,1,"SCH-2026-003151 moved 70 min earlier so it starts at 2026-11-13 23:09:00, inside SCH-2026-003127 on MACH-008 (which runs until 2026-11-14 00:19:00)",2026-10-22 11:00:00
+GT-2026-000003,RUN-2026-000002,operation_schedule,SCH-2026-003041,SCH-2026-003035,OVERLAP,1,"SCH-2026-003041 moved 205 min earlier so it starts at 2026-11-12 18:35:00, inside SCH-2026-003035 on MACH-007 (which runs until 2026-11-12 19:43:00)",2026-10-22 11:00:00
+GT-2026-000004,RUN-2026-000002,operation_schedule,SCH-2026-003550,SCH-2026-003549,PRECEDENCE,1,"SCH-2026-003550 (operation 3) moved 3 min earlier so it starts at 2026-11-20 10:16:00, before SCH-2026-003549 ends at 2026-11-20 10:17:00",2026-10-22 11:00:00
+GT-2026-000005,RUN-2026-000002,operation_schedule,SCH-2026-003856,SCH-2026-003819,PRECEDENCE,1,"SCH-2026-003856 (operation 3) moved 23 min earlier so it starts at 2026-11-26 17:34:00, before SCH-2026-003819 ends at 2026-11-26 17:35:00",2026-10-22 11:00:00
+GT-2026-000006,RUN-2026-000002,operation_schedule,SCH-2026-003873,SCH-2026-003304,PRECEDENCE,1,"SCH-2026-003873 (operation 2) moved 29 min earlier so it starts at 2026-11-27 07:23:00, before SCH-2026-003304 ends at 2026-11-27 07:24:00",2026-10-22 11:00:00
+GT-2026-000007,RUN-2026-000002,operation_schedule,SCH-2026-002856,,MATERIAL_EARLY,1,"SCH-2026-002856 moved 5 min earlier so it starts at 2026-11-11 06:59:00, before the first usable lot of MAT-148 arrives at 2026-11-11 07:00:00",2026-10-22 11:00:00
+GT-2026-000008,RUN-2026-000002,operation_schedule,SCH-2026-002396,,MATERIAL_EARLY,1,"SCH-2026-002396 moved 24 min earlier so it starts at 2026-11-06 09:59:00, before the first usable lot of MAT-130 arrives at 2026-11-06 10:00:00",2026-10-22 11:00:00
+GT-2026-000009,RUN-2026-000002,operation_schedule,SCH-2026-002694,,MATERIAL_EARLY,1,"SCH-2026-002694 moved 31 min earlier so it starts at 2026-11-10 10:59:00, before the first usable lot of MAT-141 arrives at 2026-11-10 11:00:00",2026-10-22 11:00:00
+GT-2026-000010,RUN-2026-000002,operation_schedule,SCH-2026-002188,,OUTSIDE_SHIFT,1,"SCH-2026-002188 moved 174 min later to 2026-11-06 14:30:00 to 2026-11-06 16:05:00, where MACH-004 has no working shift",2026-10-22 11:00:00
+GT-2026-000011,RUN-2026-000002,operation_schedule,SCH-2026-003791,,OUTSIDE_SHIFT,1,"SCH-2026-003791 moved 275 min later to 2026-11-25 22:30:00 to 2026-11-25 23:15:00, where MACH-040 has no working shift",2026-10-22 11:00:00
+GT-2026-000012,RUN-2026-000002,operation_schedule,SCH-2026-003048,,OUTSIDE_SHIFT,1,"SCH-2026-003048 moved 169 min later to 2026-11-24 14:30:00 to 2026-11-24 15:43:00, where MACH-005 has no working shift",2026-10-22 11:00:00
+GT-2026-000013,RUN-2026-000002,operation_schedule,SCH-2026-002274,SCH-2026-002248,MISSING_CHANGEOVER,1,"SCH-2026-002274: setup cut from 3 to 0 min, but changeover GEAR to GEAR needs 3 min",2026-10-22 11:00:00
+GT-2026-000014,RUN-2026-000002,operation_schedule,SCH-2026-002364,SCH-2026-002356,MISSING_CHANGEOVER,1,"SCH-2026-002364: setup cut from 1 to 0 min, but changeover FASTENER to FASTENER needs 1 min",2026-10-22 11:00:00
+GT-2026-000015,RUN-2026-000002,operation_schedule,SCH-2026-003420,SCH-2026-003373,MISSING_CHANGEOVER,1,"SCH-2026-003420: setup cut from 5 to 0 min, but changeover SHAFT to SHAFT needs 5 min",2026-10-22 11:00:00
+GT-2026-000016,RUN-2026-000002,operation_schedule,SCH-2026-001968,,NONE,0,"Control row: untouched, valid in the base run",2026-10-22 11:00:00
+GT-2026-000017,RUN-2026-000002,operation_schedule,SCH-2026-002317,,NONE,0,"Control row: untouched, valid in the base run",2026-10-22 11:00:00
+GT-2026-000018,RUN-2026-000002,operation_schedule,SCH-2026-002393,,NONE,0,"Control row: untouched, valid in the base run",2026-10-22 11:00:00
+GT-2026-000019,RUN-2026-000002,operation_schedule,SCH-2026-002478,,NONE,0,"Control row: untouched, valid in the base run",2026-10-22 11:00:00
+GT-2026-000020,RUN-2026-000002,operation_schedule,SCH-2026-002821,,NONE,0,"Control row: untouched, valid in the base run",2026-10-22 11:00:00
+GT-2026-000021,RUN-2026-000002,operation_schedule,SCH-2026-002968,,NONE,0,"Control row: untouched, valid in the base run",2026-10-22 11:00:00
+GT-2026-000022,RUN-2026-000002,operation_schedule,SCH-2026-003066,,NONE,0,"Control row: untouched, valid in the base run",2026-10-22 11:00:00
+GT-2026-000023,RUN-2026-000002,operation_schedule,SCH-2026-003088,,NONE,0,"Control row: untouched, valid in the base run",2026-10-22 11:00:00
+GT-2026-000024,RUN-2026-000002,operation_schedule,SCH-2026-003308,,NONE,0,"Control row: untouched, valid in the base run",2026-10-22 11:00:00
+GT-2026-000025,RUN-2026-000002,operation_schedule,SCH-2026-003448,,NONE,0,"Control row: untouched, valid in the base run",2026-10-22 11:00:00
