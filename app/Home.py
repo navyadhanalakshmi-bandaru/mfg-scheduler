@@ -28,9 +28,9 @@ cols[3].metric("Hard violations", metrics.get("hard_violations"))
 
 st.subheader("All KPIs")
 st.dataframe(pd.DataFrame([(k, str(v)) for k, v in metrics.items()], columns=["KPI", "Value"]),
-             use_container_width=True, hide_index=True)
+             width="stretch", hide_index=True)
 
 st.subheader("Runs")
 st.dataframe(common.frame(
     "SELECT run_id, run_type, parent_run_id, scheduling_rule, status, feasibility_label"
-    " FROM schedule_run ORDER BY run_id"), use_container_width=True, hide_index=True)
+    " FROM schedule_run ORDER BY run_id"), width="stretch", hide_index=True)
