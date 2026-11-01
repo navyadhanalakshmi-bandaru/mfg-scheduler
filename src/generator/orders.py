@@ -36,8 +36,8 @@ ORDER_RELEASED_AT = "2026-10-22 08:30:00"
 
 PRIORITY_RANK = {"URGENT": 1, "HIGH": 2, "NORMAL": 3, "LOW": 4}
 PRIORITY_SHARE = {"URGENT": 0.05, "HIGH": 0.15, "LOW": 0.20}  # NORMAL = the rest
-DAYS_PER_OP = {"URGENT": 1.0, "HIGH": 1.5, "NORMAL": 2.0, "LOW": 3.0}
-RELEASE_WEEKS = 5
+DAYS_PER_OP = {"URGENT": 0.6, "HIGH": 1.0, "NORMAL": 1.4, "LOW": 2.0}
+RELEASE_WEEKS = 2
 DUE_CAP = (HORIZON_END_DT - timedelta(days=4)).replace(hour=17, minute=0, second=0)
 
 ORDER_LOAD_ORDER = ["production_order", "operation", "operation_material_req",
