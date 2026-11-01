@@ -1,8 +1,8 @@
 """Baseline run writer (Phase 5d).
 
 Writes one BASELINE run: schedule_run, operation_schedule, placement_decision,
-schedule_event, scheduling_exception, plus order/operation status updates.
-(RESERVE transactions come in a later step.)
+schedule_event, scheduling_exception, inventory_transaction, plus order/operation
+status updates.
 """
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from collections import Counter
 
 from src.engine.dispatcher import DISPATCH_WINDOW, DispatchResult, _ts
 from src.engine.model import FeasibilityResult, Model
+from src.engine.transactions import write_transactions
 from src.generator import ids
 
 RUN_TIME = "2026-10-22 09:00:00"  # fixed so output is reproducible
@@ -51,6 +52,10 @@ def write_baseline(con: sqlite3.Connection, model: Model, feas: FeasibilityResul
         "INSERT INTO operation_schedule (schedule_id, run_id, operation_id, machine_id, setup_start,"
         " setup_minutes, start_time, processing_minutes, end_time, previous_schedule_id, status,"
         " created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+
+    # ---- inventory_transaction (RESERVE, then CONSUME or RELEASE)
+    write_transactions(con, run_id, feas,
+                       {p.operation_id: _ts(p.start) for p in result.placements}, run_time)
 
     # ---- order outcome
     placed_count = Counter(p.order_id for p in result.placements)
@@ -139,7 +144,7 @@ if __name__ == "__main__":
     new_run = write_baseline(con, mdl, fe, dispatch(mdl, fe, tls, wins, chosen_rule))
     print(new_run, chosen_rule)
     for t in ("schedule_run", "operation_schedule", "placement_decision", "schedule_event",
-              "scheduling_exception", "order_status_history"):
+              "scheduling_exception", "order_status_history", "inventory_transaction"):
         print(f"{t:24s} {con.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]:6d}")
     for status, count in con.execute("SELECT status, COUNT(*) FROM production_order"
                                      " GROUP BY status ORDER BY status"):

@@ -14,6 +14,8 @@ Rules, each in one place:
     locked job. A breakdown that interrupts a running job is not modelled.
   * The new run is a complete schedule: run_type RESCHEDULE, parent_run_id set.
     Validation and KPIs are separate steps (validate_and_record, record_metrics).
+  * The new run writes its own inventory transactions (RESERVE, then CONSUME or
+    RELEASE); the parent run's transactions are never touched.
   * Everything is written in one transaction. On any error nothing is kept.
 """
 from __future__ import annotations
@@ -24,6 +26,7 @@ from collections import Counter
 
 from src.engine.dispatcher import DISPATCH_WINDOW, RULES, Placement, _ts, dispatch, prepare
 from src.engine.timeline import parse
+from src.engine.transactions import write_transactions
 from src.generator import ids
 
 DOWNTIME_TYPES = ("PLANNED_MAINTENANCE", "BREAKDOWN", "CALIBRATION", "HOLIDAY")
@@ -177,6 +180,9 @@ def _reschedule(con, parent_id, trigger_text, why, downtimes, rule, run_time) ->
         "INSERT INTO operation_schedule (schedule_id, run_id, operation_id, machine_id, setup_start,"
         " setup_minutes, start_time, processing_minutes, end_time, previous_schedule_id, status,"
         " created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+
+    # ---- inventory_transaction (this run's own RESERVE, then CONSUME or RELEASE)
+    write_transactions(con, run_id, feas, {p.operation_id: _ts(p.start) for p, _ in entries}, run_time)
 
     # ---- order outcome
     issues = list(feas.issues) + list(result.issues)

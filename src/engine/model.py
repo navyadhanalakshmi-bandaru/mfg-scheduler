@@ -68,6 +68,7 @@ class FeasibilityResult:
     issues: list[Issue] = field(default_factory=list)
     infeasible_orders: set[str] = field(default_factory=set)
     material_ready: dict[str, str] = field(default_factory=dict)  # operation_id -> time
+    allocations: dict[str, list[tuple[str, float]]] = field(default_factory=dict)  # operation_id -> (lot_id, qty)
 
 
 @dataclass
@@ -193,9 +194,11 @@ def _allocate_materials(model: Model, excluded: set[str],
             continue
         taken: list[tuple[str, float]] = []
         ready: dict[str, str] = {}
+        per_op: dict[str, list[tuple[str, float]]] = {}
         failure = None
         for op in model.ops_by_order[order.order_id]:
             op_ready = ""
+            op_taken: list[tuple[str, float]] = []
             for material_id, qty in model.requirements.get(op.operation_id, []):
                 need = qty
                 for lot in model.lots.get(material_id, []):
@@ -207,6 +210,7 @@ def _allocate_materials(model: Model, excluded: set[str],
                     use = min(available, need)
                     remaining[lot.lot_id] -= use
                     taken.append((lot.lot_id, use))
+                    op_taken.append((lot.lot_id, use))
                     need -= use
                     op_ready = max(op_ready, lot.available_from)
                 if need > EPS:
@@ -216,6 +220,8 @@ def _allocate_materials(model: Model, excluded: set[str],
                 break
             if op_ready:
                 ready[op.operation_id] = op_ready
+            if op_taken:
+                per_op[op.operation_id] = op_taken
         if failure:
             for lot_id, use in taken:
                 remaining[lot_id] += use
@@ -225,6 +231,7 @@ def _allocate_materials(model: Model, excluded: set[str],
             result.infeasible_orders.add(order.order_id)
         else:
             result.material_ready.update(ready)
+            result.allocations.update(per_op)
 
 
 def find_issues(model: Model) -> FeasibilityResult:
