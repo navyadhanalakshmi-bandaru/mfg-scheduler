@@ -134,3 +134,15 @@ def test_detects_unclosed_reservation_and_missing_consumption(db):
     found = codes(check_inventory(con, run))
     assert "RESERVATION_UNBALANCED" in found
     assert "REQUIREMENT_MISMATCH" in found
+def test_inventory_problem_makes_the_run_infeasible(db):
+    from src.validation.constraints import validate_and_record
+    con, run, _ = db
+    tid, _ = first_consume(con, run)
+    con.execute("DELETE FROM inventory_transaction WHERE txn_id = ?", (tid,))
+    validate_and_record(con, run)
+    label, metrics = con.execute("SELECT feasibility_label, metrics_json FROM schedule_run"
+                                 " WHERE run_id = ?", (run,)).fetchone()
+    assert label == "INFEASIBLE_VIOLATIONS"
+    assert '"inventory_issues"' in metrics
+    assert con.execute("SELECT COUNT(*) FROM scheduling_exception WHERE run_id = ? AND code IN"
+                       " ('RESERVATION_UNBALANCED','REQUIREMENT_MISMATCH')", (run,)).fetchone()[0] >= 2

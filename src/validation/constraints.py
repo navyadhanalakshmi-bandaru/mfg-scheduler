@@ -7,6 +7,8 @@ Checks a saved run against eight hard constraints:
     MACHINE_OVERLAP, PRECEDENCE_VIOLATION, MATERIAL_BEFORE_AVAILABILITY,
     OUTSIDE_SHIFT, MISSING_CHANGEOVER, INELIGIBLE_MACHINE,
     LABOR_CAPACITY_EXCEEDED, TOOL_CAPACITY_EXCEEDED
+Stock accounting (RESERVE / CONSUME / RELEASE) is checked separately by
+src/validation/inventory.py and feeds the same feasibility label.
 
 Conventions (the same ones the baseline run records in its config):
   * A job occupies its machine, its operators and its tools from setup_start
@@ -32,6 +34,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 
 from src.generator import ids
+from src.validation.inventory import InventoryIssue, check_inventory
 
 VALIDATION_TIME = "2026-10-22 10:00:00"  # fixed so output is reproducible
 EPS = 1e-6
@@ -319,10 +322,15 @@ def validate_run(con: sqlite3.Connection, run_id: str) -> list[Violation]:
 
 
 def validate_and_record(con: sqlite3.Connection, run_id: str,
-                        checked_at: str = VALIDATION_TIME) -> list[Violation]:
+                        checked_at: str = VALIDATION_TIME) -> list[Violation | InventoryIssue]:
     """Validate a run once, write CONSTRAINT_VIOLATION rows, set feasibility_label.
 
-    The label becomes FEASIBLE only when there are zero hard violations.
+    Two independent checks feed the label: the schedule checks (validate_run) and,
+    when the run has inventory transactions, the stock checks (check_inventory).
+    The label becomes FEASIBLE only when both find nothing.
+    Returns the schedule violations followed by the stock issues, so the length of
+    the returned list equals the number of exception rows written and
+    metrics["hard_violations"].
     A run that is already validated is refused, because exceptions are append-only.
     """
     row = con.execute("SELECT feasibility_label, metrics_json FROM schedule_run WHERE run_id = ?",
@@ -333,20 +341,31 @@ def validate_and_record(con: sqlite3.Connection, run_id: str,
         raise ValueError(f"run {run_id} was already validated (label {row[0]})")
 
     violations = validate_run(con, run_id)
+    has_transactions = con.execute("SELECT 1 FROM inventory_transaction WHERE run_id = ? LIMIT 1",
+                                   (run_id,)).fetchone() is not None
+    inventory = check_inventory(con, run_id) if has_transactions else []
+
     n = con.execute("SELECT COUNT(*) FROM scheduling_exception").fetchone()[0] + 1
+    rows = [(ids.exception_id(n + i), run_id, "CONSTRAINT_VIOLATION", v.code, "HARD", v.order_id,
+             v.operation_id, v.machine_id, v.message, "VALIDATOR", checked_at)
+            for i, v in enumerate(violations)]
+    for j, issue in enumerate(inventory):
+        order_id = ids.parse_operation_id(issue.operation_id)[0] if issue.operation_id else None
+        rows.append((ids.exception_id(n + len(violations) + j), run_id, "CONSTRAINT_VIOLATION",
+                     issue.code, "HARD", order_id, issue.operation_id, None, issue.message,
+                     "VALIDATOR", checked_at))
     con.executemany(
         "INSERT INTO scheduling_exception (exception_id, run_id, category, code, severity, order_id,"
         " operation_id, machine_id, message, detected_by, created_at)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-        [(ids.exception_id(n + i), run_id, "CONSTRAINT_VIOLATION", v.code, "HARD", v.order_id,
-          v.operation_id, v.machine_id, v.message, "VALIDATOR", checked_at)
-         for i, v in enumerate(violations)])
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
 
+    codes = Counter([v.code for v in violations] + [i.code for i in inventory])
     metrics = json.loads(row[1]) if row[1] else {}
-    metrics["hard_violations"] = len(violations)
-    metrics["violations_by_code"] = dict(sorted(Counter(v.code for v in violations).items()))
-    label = "FEASIBLE" if not violations else "INFEASIBLE_VIOLATIONS"
+    metrics["hard_violations"] = len(violations) + len(inventory)
+    metrics["inventory_issues"] = len(inventory)
+    metrics["violations_by_code"] = dict(sorted(codes.items()))
+    label = "FEASIBLE" if not (violations or inventory) else "INFEASIBLE_VIOLATIONS"
     con.execute("UPDATE schedule_run SET feasibility_label = ?, metrics_json = ? WHERE run_id = ?",
                 (label, json.dumps(metrics, sort_keys=True), run_id))
     con.commit()
-    return violations
+    return violations + inventory
