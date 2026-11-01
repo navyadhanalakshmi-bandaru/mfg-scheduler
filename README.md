@@ -62,3 +62,24 @@ intentional generator change run `python scripts\update_golden.py`.
   (about a third of orders late under the baseline rules).
 - These assumptions were chosen without the original challenge text and each lives in one place
   in the code, so they are easy to change.
+
+  ## Provenance
+
+All data is synthetic, generated from seed 20261022. No real personal, customer or
+company data is used.
+
+## Anomaly workflow
+
+`python -m src.validation.anomalies full --save` copies a valid run into an injected
+run, corrupts 15 rows (3 each of OVERLAP, PRECEDENCE, MATERIAL_EARLY, OUTSIDE_SHIFT,
+MISSING_CHANGEOVER), checks that the independent validator finds them, and writes the
+labels to `data/ground_truth/ground_truth.csv`. Columns: `gt_id, run_id, record_entity,
+record_id, related_record_id, issue_type, ground_truth, description, created_at`. The
+engine never reads these labels (enforced by `tests/unit/test_no_label_leakage.py`).
+
+## Documentation
+
+- Data dictionary: `docs/data_dictionary.md`
+- ERD: `docs/ERD.md`
+- API endpoints: `docs/api_endpoints.md`
+- Project plan: `docs/PROJECT_PLAN.md`
